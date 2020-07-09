@@ -1,0 +1,8 @@
+build_definitions:
+    - python_wheel_macos:
+        command: make rackdash_publish_wheel 
+        node_type: spe_build_mac
+
+    - python_wheel_linux:
+        command: make rackdash_publish_wheel 
+        node_type: squid_build

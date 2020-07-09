@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    echo "Usage:" `basename $0` "<rpm> (output file)" >&2
+    exit 1
+fi
+
+# check to ensure needed tools are present
+if ! [ -x "$(command -v rpm2cpio.pl)" ] ; then
+    echo "Error: rpm2cpio.pl is not available." >&2
+    echo "    On Mac OS: brew install rpm2cpio" >&2
+    echo "    On Linux:  apt install rpm2cpio"  >&2
+    exit 1
+fi
+
+if ! [ -x "$(command -v zip)" ] ; then
+    echo "Error: zip is not available." >&2
+    echo "    On Linux:  apt install zip"  >&2
+    exit 1
+fi
+
+# check to ensure source file exists
+if ! [ -f $1 ]; then
+    echo "Error: '$1' does not exist." >&2
+    exit 1
+fi
+
+ORIGDIR=`pwd`
+TMP=`mktemp -d`
+
+if [ $# -eq 2 ]; then
+ZIPNAME=$2
+else
+ZIPNAME=`echo $1 | egrep -o "[a-zA-Z0-9]+-[0-9.-]+"`
+fi
+
+if [[ ${ZIPNAME} == *. ]]; then
+    ZIPNAME=${ZIPNAME}zip
+elif [[ ${ZIPNAME} != *.zip ]]; then
+    ZIPNAME=${ZIPNAME}.zip
+fi
+
+DIRNAME=${ZIPNAME%.*}
+
+echo Converting $1 to ${ORIGDIR}/${ZIPNAME}
+echo
+cd ${TMP}
+mkdir ${DIRNAME}
+mkdir ${DIRNAME}/lib
+mkdir ${DIRNAME}/include
+
+rpm2cpio.pl $1 | cpio -idm --quiet
+cp usr/i686-w64-mingw32/sys-root/mingw/bin/*.dll ${DIRNAME}/lib
+if [ -d usr/i686-w64-mingw32/sys-root/mingw/include ]; then
+    cp usr/i686-w64-mingw32/sys-root/mingw/include/*.h ${DIRNAME}/include
+else
+    echo "Warning: rpm contains no header files"
+fi
+zip -r ${ORIGDIR}/${ZIPNAME} ${DIRNAME}
+
+cd ${ORIGDIR}
+rm -rf ${TMP}

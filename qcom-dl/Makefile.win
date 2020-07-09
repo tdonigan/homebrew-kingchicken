@@ -1,0 +1,121 @@
+.SUFFIXES: .c .o
+
+include version.mk
+
+CC := i686-w64-mingw32-gcc
+
+CXX := i686-w64-mingw32-g++
+
+VIRTUALENV := /usr/bin/env python2 -m virtualenv
+
+INS_LIB := tools/install_winlib
+
+SOURCEDIR := src
+
+BUILDDIR ?= build.win
+
+PKGDIR = $(BUILDDIR)/pkg
+
+WINLIB_DIR ?= $(BUILDDIR)/winlib
+
+HEADER_SEARCH_CFLAGS := -I./inc \
+                        -I$(WINLIB_DIR)/include \
+                        -I$(WINLIB_DIR)/include/libxml2 \
+                        -I$(WINLIB_DIR)/include/libusb-1.0 \
+                        -I$(WINLIB_DIR)/include/libyaml-0.1
+
+LIBRARY_SEARCH_LDFLAGS := -L$(WINLIB_DIR)/lib
+
+EXE_PRODUCT ?= $(BUILDDIR)/qcom-dl.exe
+
+WINDOWS_DEPS_FILE ?= windows-dependencies.txt
+
+ZIP_FNAME = qcomdl.win32-$(VERSION).zip
+
+PY_VENV_DIR := $(BUILDDIR)/venv
+
+SRCS := $(wildcard $(SOURCEDIR)/*.c)
+
+LIB_SRCS := $(filter-out $(SOURCEDIR)/main.c, $(SRCS))
+
+WARNINGS ?= error all
+
+NO_WARNINGS ?= packed \
+               padded \
+               variadic-macros \
+               unused-parameter \
+               unknown-pragmas \
+               strict-aliasing \
+
+DEBUG_CFLAGS ?= -g -DDEBUG
+
+CFLAGS += -std=gnu11 \
+          -O2 \
+          -DQCOMDL_STATIC \
+          -DQCOMDL_VERSION=\"$(VERSION)\" \
+          -D_BSD_SOURCE \
+          -D__USE_MINGW_ANSI_STDIO=1 \
+          -fvisibility=hidden \
+          $(patsubst %,-W%,$(WARNINGS)) \
+          $(patsubst %,-Wno-%,$(NO_WARNINGS)) \
+          $(HEADER_SEARCH_CFLAGS) \
+          $(DEBUG_CFLAGS) \
+
+LDFLAGS := -lusb-1.0 -lxml2-2 -lzip-5 -lyaml-0.1 $(LIBRARY_SEARCH_LDFLAGS)
+
+# make our OBJ lists from SRCS lists
+OBJS := $(patsubst $(SOURCEDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+
+LIB_OBJS := $(patsubst $(SOURCEDIR)/%.c,$(BUILDDIR)/%.o,$(LIB_SRCS))
+
+WINLIB_URL ?= https://hwbuild.corp.squareup.com/x2/build-prereqs/windows
+
+# targets
+
+all: exe
+
+exe: $(EXE_PRODUCT)
+
+$(BUILDDIR):
+	@mkdir -p $(BUILDDIR)
+
+python_setup:
+	$(VIRTUALENV) --no-site-packages $(PY_VENV_DIR)
+
+clean:
+	rm -f $(OBJS) $(EXE_PRODUCT) $(LIB_PRODUCT) $(STATIC_LIB_PRODUCT)
+
+distclean:
+	rm -rf $(BUILDDIR)
+
+clean_package:
+	rm -rf $(PKGDIR)
+	rm -rf $(BUILDDIR)/qcomdl.win32-*.zip
+
+package: exe clean_package
+	mkdir $(PKGDIR)
+	cp $(EXE_PRODUCT) $(PKGDIR)
+	cp $(WINLIB_DIR)/lib/* $(PKGDIR)
+	cd $(PKGDIR) && zip -r ../$(ZIP_FNAME) .
+	@echo "[+] Created windows package at $(BUILDDIR)/$(ZIP_FNAME)"
+
+$(BUILDDIR)/%.o: $(SOURCEDIR)/%.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+$(WINLIB_DIR): $(WINDOWS_DEPS_FILE)
+	@echo "[+] Installing windows dependencies from $(WINDOWS_DEPS_FILE)"
+	rm -rf $(WINLIB_DIR)
+	egrep -v '^(#|\s*$$)' $(WINDOWS_DEPS_FILE) | while read zip inc lib junk; do \
+	  $(INS_LIB) $(WINLIB_DIR) $(WINLIB_URL)/$$zip $$inc $$lib ;\
+	  if [ $$? != 0 ]; then \
+	    rm -rf $(WINLIB_DIR);\
+	    exit 1;\
+	  fi;\
+	done
+	@echo
+
+deps: $(WINLIB_DIR)
+
+$(EXE_PRODUCT): $(BUILDDIR) $(WINLIB_DIR) $(OBJS)
+	$(CC) -o $@ $(OBJS) $(LDFLAGS)
+

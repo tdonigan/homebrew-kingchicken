@@ -1,0 +1,13 @@
+# This file is used to download and install library dependencies for the
+# windows build. It is referenced from the windows-sepecific makefile.
+
+# zipfile                   include dir                     dll dir
+zlib-1.2.8-win32-x86.zip    zlib-1.2.8/include              zlib-1.2.8/bin
+libxml2-2.9.3-win32-x86.zip libxml2-2.9.3/include           libxml2-2.9.3/bin
+iconv-1.14-win32-x86.zip    iconv-1.14/include              iconv-1.14/bin
+mingwrt-5.2.0-win32-x86.zip mingwrt-5.2.0/include           mingwrt-5.2.0/bin
+libusb-1.0.22.zip           libusb-1.0.22/include           libusb-1.0.22/MinGW32/dll
+libzip-1.5.1-2.zip          libzip-1.5.1-2/include          libzip-1.5.1-2/lib
+bzip2-1.0.6-11.zip          bzip2-1.0.6-11/include          bzip2-1.0.6-11/lib
+gcc-libs-8.1.0-2.zip        gcc-libs-8.1.0-2/include        gcc-libs-8.1.0-2/lib
+libyaml-0.1.zip             libyaml-0.1/include             libyaml-0.1/lib

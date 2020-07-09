@@ -1,0 +1,72 @@
+#!/usr/bin/env python2
+
+import os
+import re
+import ssl
+import sys
+
+from shutil import copyfileobj, copytree, copyfile
+from urllib2 import urlopen
+from urlparse import urlparse
+from zipfile import ZipFile
+from os import path
+
+def mkdir_p(fpath):
+    if not path.exists(fpath):
+        os.makedirs(fpath)
+
+def copy_to_dir(src, dstdir):
+    dst = path.join(dstdir, item)
+    if path.isdir(src):
+        print "[+] copying %s recursively to %s" %(src, dst)
+        copytree(src, dst)
+    elif path.isfile(src):
+        print "[+] copying %s to %s" %(src, dst)
+        copyfile(src, dst)
+
+def download_and_extract(url, localpath):
+    gcontext = ssl._create_unverified_context()
+    url_pieces = urlparse(url)
+    filepath = path.join(localpath, path.basename(url_pieces.path))
+    print "[+] Downloading %s" % url
+    rsp = urlopen(url, context=gcontext)
+    with open(filepath, "wb") as fp:
+        copyfileobj(rsp, fp)
+    print "[+] Extracting %s" % filepath
+    zf = ZipFile(filepath)
+    zf.extractall(localpath)
+    return True
+
+if len(sys.argv) < 5:
+    print "Usage: %s path/to/winlib https://somehost/somelib.zip incdir dlldir" % path.basename(sys.argv[0])
+    sys.exit(1)
+
+winlib_path = sys.argv[1]
+url = sys.argv[2]
+incdir = sys.argv[3]
+dlldir = sys.argv[4]
+
+local_incdir = path.join(winlib_path, "include")
+local_libdir = path.join(winlib_path, "lib")
+
+mkdir_p(winlib_path)
+
+if not download_and_extract(url, winlib_path):
+    print "Error: could not download and extract the requested url\n"
+    sys.exit(1)
+
+mkdir_p(local_incdir)
+mkdir_p(local_libdir)
+
+inc_src = path.join(winlib_path, incdir)
+for item in os.listdir(inc_src):
+    src = path.join(inc_src, item)
+    copy_to_dir(src, local_incdir)
+
+lib_src = path.join(winlib_path, dlldir)
+for item in os.listdir(lib_src):
+    src = path.join(lib_src, item)
+    dst = path.join(local_libdir, item)
+    if path.isfile(src) and src.endswith(".dll"):
+        copy_to_dir(src, local_libdir)
+
